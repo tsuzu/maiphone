@@ -1,0 +1,242 @@
+package interphoneconn
+
+import (
+	"bytes"
+	"encoding/hex"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+)
+
+func loadRawPacket(t *testing.T, name string) []byte {
+	t.Helper()
+
+	b, err := os.ReadFile(filepath.Join("testdata/packets", name))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decoded, err := hex.DecodeString(strings.TrimSpace(string(b)))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return decoded
+}
+
+func loadRawPacketReader(t *testing.T, name string) io.Reader {
+	t.Helper()
+
+	return bytes.NewReader(loadRawPacket(t, name))
+}
+
+func TestParsePacket(t *testing.T) {
+	type args struct {
+		r io.Reader
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *Packet
+		wantErr bool
+	}{
+		{
+			name: "test_parse_packet_1",
+			args: args{
+				r: loadRawPacketReader(t, "test_parse_packet_1.hex"),
+			},
+			want: &Packet{
+				ID:    1,
+				UUID:  "5366EC36-A727-483A-B1C9-92C2C0DB509C",
+				Flags: []byte{0x00, 0x00, 0xf1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			},
+		},
+		{
+			name: "test_parse_packet_2",
+			args: args{
+				r: loadRawPacketReader(t, "test_parse_packet_2.hex"),
+			},
+			want: &Packet{
+				ID:    1,
+				UUID:  "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+				Flags: []byte{0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			},
+		},
+		{
+			name: "test_parse_packet_3",
+			args: args{
+				r: loadRawPacketReader(t, "test_parse_packet_3.hex"),
+			},
+			want: &Packet{
+				ID:    6,
+				UUID:  "5366EC36-A727-483A-B1C9-92C2C0DB509C",
+				Flags: []byte{0x00, 0x00, 0x01, 0x04, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+				Trailing: *bytes.NewBuffer([]byte{
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				}),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParsePacket(tt.args.r)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParsePacket() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			diff := cmp.Diff(got, tt.want, cmp.Comparer(func(a, b bytes.Buffer) bool {
+				return bytes.Equal(a.Bytes(), b.Bytes())
+			}))
+			if diff != "" {
+				t.Errorf("ParsePacket() diff = %v", diff)
+			}
+		})
+	}
+}
+
+func TestPacketCompose(t *testing.T) {
+	type args struct {
+		r io.Reader
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *Packet
+		wantErr bool
+	}{
+		{
+			name: "test_parse_packet_1",
+			args: args{
+				r: loadRawPacketReader(t, "test_parse_packet_1.hex"),
+			},
+			want: &Packet{
+				ID:    1,
+				UUID:  "5366EC36-A727-483A-B1C9-92C2C0DB509C",
+				Flags: []byte{0x00, 0x00, 0xf1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			},
+		},
+		{
+			name: "test_parse_packet_2",
+			args: args{
+				r: loadRawPacketReader(t, "test_parse_packet_2.hex"),
+			},
+			want: &Packet{
+				ID:    1,
+				UUID:  "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+				Flags: []byte{0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			},
+		},
+		{
+			name: "test_parse_packet_3",
+			args: args{
+				r: loadRawPacketReader(t, "test_parse_packet_3.hex"),
+			},
+			want: &Packet{
+				ID:    6,
+				UUID:  "5366EC36-A727-483A-B1C9-92C2C0DB509C",
+				Flags: []byte{0x00, 0x00, 0x01, 0x04, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+				Trailing: *bytes.NewBuffer([]byte{
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				}),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParsePacket(tt.args.r)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParsePacket() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			diff := cmp.Diff(got, tt.want, cmp.Comparer(func(a, b bytes.Buffer) bool {
+				return bytes.Equal(a.Bytes(), b.Bytes())
+			}))
+			if diff != "" {
+				t.Errorf("ParsePacket() diff = %v", diff)
+			}
+		})
+	}
+}
+
+func TestPacket_Compose(t *testing.T) {
+	type fields struct {
+		ID       int
+		UUID     string
+		Flags    []byte
+		Trailing bytes.Buffer
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []byte
+	}{
+		{
+			name: "test_parse_packet_1",
+			want: loadRawPacket(t, "test_parse_packet_1.hex"),
+			fields: fields{
+				ID:    1,
+				UUID:  "5366EC36-A727-483A-B1C9-92C2C0DB509C",
+				Flags: []byte{0x00, 0x00, 0xf1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			},
+		},
+		{
+			name: "test_parse_packet_2",
+			want: loadRawPacket(t, "test_parse_packet_2.hex"),
+			fields: fields{
+				ID:    1,
+				UUID:  "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+				Flags: []byte{0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			},
+		},
+		{
+			name: "test_parse_packet_3",
+			want: loadRawPacket(t, "test_parse_packet_3.hex"),
+			fields: fields{
+				ID:    6,
+				UUID:  "5366EC36-A727-483A-B1C9-92C2C0DB509C",
+				Flags: []byte{0x00, 0x00, 0x01, 0x04, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+				Trailing: *bytes.NewBuffer([]byte{
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				}),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &Packet{
+				ID:       tt.fields.ID,
+				UUID:     tt.fields.UUID,
+				Flags:    tt.fields.Flags,
+				Trailing: tt.fields.Trailing,
+			}
+
+			got := p.Compose()
+			diff := cmp.Diff(got, tt.want)
+
+			if diff != "" {
+				t.Errorf("Packet.Compose() diff = %v", diff)
+			}
+		})
+	}
+}
