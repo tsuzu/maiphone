@@ -1,4 +1,4 @@
-package interphoneconn
+package mngconn
 
 import (
 	"bytes"
@@ -22,6 +22,16 @@ const (
 	flagLen = 14
 )
 
+const (
+	InitSend           = 0x00
+	StatusNotification = 0x01
+	InitRecv           = 0x02
+	ConnectPayload     = 0xf1
+	ConnectedPayload   = 0xf5
+	PingPayload        = 0xf2
+	PongPayload        = 0xff
+)
+
 type Packet struct {
 	ID    int
 	UUID  string
@@ -36,6 +46,15 @@ func NewPacket() *Packet {
 	p.Flags = make([]byte, 14)
 
 	return &p
+}
+
+func NewPong(id int) *Packet {
+	p := NewPacket()
+
+	p.SetPayloadType(PongPayload)
+	p.ID = id
+
+	return p
 }
 
 func ParsePacket(r io.Reader) (*Packet, error) {
@@ -95,6 +114,14 @@ func (p *Packet) UpdateFlags(b []byte) {
 	}
 
 	copy(p.Flags, b)
+}
+
+func (p *Packet) SetPayloadType(pt byte) {
+	p.Flags[2] = pt
+}
+
+func (p *Packet) GetPayloadType() byte {
+	return p.Flags[2]
 }
 
 func (p *Packet) Compose() []byte {

@@ -1,4 +1,4 @@
-package interphoneconn
+package mngconn
 
 import (
 	"bytes"
